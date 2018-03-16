@@ -11,11 +11,20 @@ namespace App\Services\Parsers\Novus;
 
 use App\Services\Parsers\DTO\Category;
 use App\Services\Parsers\DTO\Product;
+use App\Services\Parsers\StoreParsedDataService;
 use Symfony\Component\DomCrawler\Crawler;
 
 class NovusParserService
 {
     private $mainUrl = 'https://novus.zakaz.ua';
+    private $shop = 'Novus';
+    /** @var StoreParsedDataService */
+    private $storeDataService;
+
+    public function __construct()
+    {
+        $this->storeDataService = new StoreParsedDataService();
+    }
 
     /**
      * Parse categories
@@ -49,13 +58,23 @@ class NovusParserService
     {
         $pageUrl = $this->makeUrlToCategory($category->getLink());
         $lastPage = $this->getLastPage($pageUrl);
-
         for ($i = 1; $i <= $lastPage; $i++) {
             $pageUrl = $this->makeUrlToCategory($category->getLink(), $i);
-            $html = file_get_contents($pageUrl);
-            $products = $this->parseProductsList($html);
-            dd($products);
+            $this->updateProductsPriceOnPage($pageUrl,$category);
         }
+    }
+
+    /**
+     * Update products price on one page by url
+     *
+     * @param $pageUrl
+     * @param Category $category
+     */
+    public function updateProductsPriceOnPage($pageUrl,Category $category)
+    {
+        $html = file_get_contents($pageUrl);
+        $products = $this->parseProductsList($html);
+        $this->storeProductsOnPage($products, $category);
     }
 
     /**
@@ -77,10 +96,11 @@ class NovusParserService
             $name = $item->filter('div.one-product-name')->text() ?? null;
             $image = $item->filter('div.one-product-image img')->attr('src') ?? null;
             if ($code && $price && $name)
-                $product->setCode($code)
+                $product->setCode(preg_replace('~\D+~','',$code))
+                    ->setShopCodePrefix(preg_replace ("/[^a-zа-я\s]/si","",$code))
                     ->setName($name)
                     ->setPrice($price)
-                    ->setImageLink($image);
+                    ->setImageLinks($this->getImageLink($image));
             $parsedProducts[] = $product;
         }
         return $parsedProducts;
@@ -104,17 +124,44 @@ class NovusParserService
      * @param $fullUrl
      * @return int|string
      */
-    private function getLastPage($fullUrl)
+    public function getLastPage($fullUrl)
     {
         $html = file_get_contents($fullUrl);
         $crawler = new Crawler($html);
-        $lastLink = $crawler->filter('.pagination.pagination-centered')
-            ->filter('span.page a');
-        if ($lastLink) {
-            return $lastLink->text();
+        $list = $crawler->filter('.pagination.pagination-centered');
+        if ($count = $list->filter('a')->count()) {
+            return $list->filter('a')->eq($count - 2)->text();
         }
+
         return 0;
     }
 
+    /**
+     * Store array of Product
+     *
+     * @param array $products
+     * @param Category $category
+     */
+    private function storeProductsOnPage(array $products, Category $category)
+    {
+        foreach ($products as $product) {
+            $this->storeDataService->save($product, $category, $this->shop);
+        }
+    }
 
+    /**
+     * Sanitize url link
+     *
+     * @param $url
+     * @return string
+     */
+    private function getImageLink($url)
+    {
+        if (strpos($url, '//') === 0) {
+            $url = 'https:' . $url;
+        } elseif (strpos($url, '/') === 0) {
+            $url = $this->mainUrl . $url;
+        }
+        return $url;
+    }
 }

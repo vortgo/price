@@ -2,7 +2,8 @@
 
 namespace App\Console\Commands\Parsers;
 
-use App\Services\Parsers\Novus\Category;
+use App\Jobs\Parsers\Novus\ParseCategories;
+use App\Jobs\Parsers\Novus\ParseCategory;
 use App\Services\Parsers\Novus\NovusParserService;
 use Illuminate\Console\Command;
 
@@ -39,10 +40,8 @@ class NovusParser extends Command
      */
     public function handle()
     {
-        $category = new Category();
-        $category->setLink('/ru/babies/')->setName('Детское');
-
         $parser = new NovusParserService();
-        $parser->updateProductsPrices($category);
+        $categories = $parser->parseCategories();
+        ParseCategory::dispatch($categories[0]);
     }
 }

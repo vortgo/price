@@ -17,8 +17,10 @@ class Product
     private $name;
     /** @var  float */
     private $price;
+    /** @var  array */
+    private $imageLinks = [];
     /** @var  string */
-    private $imageLink;
+    private $shopCodePrefix = null;
 
     /**
      * @return string
@@ -75,20 +77,38 @@ class Product
     }
 
     /**
-     * @return string
+     * @return array
      */
-    public function getImageLink()
+    public function getImageLinks()
     {
-        return $this->imageLink;
+        return $this->imageLinks;
     }
 
     /**
      * @param string $imageLink
      * @return Product
      */
-    public function setImageLink($imageLink)
+    public function setImageLinks($imageLink)
     {
-        $this->imageLink = $imageLink;
+        $this->imageLinks[] = $imageLink;
+        return $this;
+    }
+
+    /**
+     * @return string
+     */
+    public function getShopCodePrefix()
+    {
+        return $this->shopCodePrefix === '' ? null : $this->shopCodePrefix;
+    }
+
+    /**
+     * @param string $shopCodePrefix
+     * @return Product
+     */
+    public function setShopCodePrefix(string $shopCodePrefix): Product
+    {
+        $this->shopCodePrefix = $shopCodePrefix;
         return $this;
     }
 }
